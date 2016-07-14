@@ -1,0 +1,124 @@
+---
+title: "Practical Machine Learning - Prediction"
+author: "Galoh Haron"
+date: "July 13, 2016"
+output: html_document
+---
+
+# Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The data will predict the manner in which praticipants did the exercise.
+
+# Data Preprocessing
+The training data for this project are available here: 
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The test data are available here: 
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+The data for this project come from this source: <http://groupware.les.inf.puc-rio.br/har>
+
+Load required essential R libraries and set the global option:
+```{r,cache=TRUE}
+library(caret)
+library(corrplot)
+library(randomForest)
+library(scales)
+```
+```{r,echo=FALSE}
+rm(list=ls()) 
+setwd("/Users/grharon/OneDrive/CourseOnline/CourseraDataScience/8PracticalMachineLearning/assignment")
+```
+
+Download and load the data from csv files
+```{r,cache=TRUE}
+if (!file.exists("pml-training.csv")) {
+  download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+                destfile = "pml-training.csv")
+}
+if (!file.exists("pml-testing.csv")) {
+  download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+                destfile = "pml-testing.csv")
+}
+
+rawTrain <- read.csv("pml-training.csv", header = TRUE, na.strings = c("NA",""))
+rawTest <- read.csv("pml-testing.csv", header = TRUE, na.strings = c("NA",""))
+
+```
+Check the structure of data and the number of each class in training set.
+```{r,cache=TRUE}
+dim(rawTrain)
+dim(rawTest)
+```
+Remove any NA values
+```{r,cache=TRUE}
+cleanTrain <- rawTrain[,(colSums(is.na(rawTrain)) == 0)]
+cleanTest <- rawTest[,(colSums(is.na(rawTest)) == 0)]
+dim(cleanTrain)
+dim(cleanTest)
+```
+
+Further, reduce the unwanted columns
+```{r,cache=TRUE}
+removeCol <- c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","new_window","'num_window'")
+validTrain <- cleanTrain[,!(names(cleanTrain) %in% removeCol)]
+validTest <- cleanTest[,!(names(cleanTest) %in% removeCol)]
+dim(validTrain)
+dim(validTest)
+```
+Training data subsets
+```{r,cache=TRUE}
+inTrain = createDataPartition(y = validTrain$classe, p = 0.7, list = FALSE)
+training <- validTrain[inTrain,]
+testing <- validTrain[-inTrain,]
+dim(training)
+dim(testing)
+```
+
+# Model creation
+## CART Model
+```{r,cache=TRUE}
+cartModel <- train(training$classe ~ ., data = training, method = "rpart")
+cartModel
+```
+The accuracy of the CART model is low:
+```{r,echo=FALSE}
+percent(max(cartModel$results$Accuracy))
+```
+
+## Random Forests Model
+```{r,cache=TRUE}
+set.seed(7)
+randomForestModel <- randomForest(classe~ ., data = training, importance = TRUE, ntree = 500)
+randomForestModel
+```
+
+## Cross Validation
+Perform a cross validation to the random forest model within the test set
+```{r,cache=TRUE}
+prediction <- predict(randomForestModel, newdata=testing)
+accuracy = sum(prediction == testing$classe) / length(prediction)
+accuracy
+```
+
+The accuracy of the random forests model is higher:
+```{r,echo=FALSE}
+percent(accuracy)
+```
+
+## Expected out of sample error
+```{r,cache=TRUE}
+cfm <- confusionMatrix(prediction,testing$classe)
+cfm
+```
+
+## Conclusion
+Predict the 20 cases from testing data
+```{r,cache=TRUE}
+answers <- predict(randomForestModel, validTest)
+answers
+```
+
+We made used of several model, CART and Random Forest Model to attain which has the higest accuracy for prediction operation. Forest Model is better than CART model.
+
